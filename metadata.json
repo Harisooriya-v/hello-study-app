@@ -1,0 +1,6 @@
+{
+  "name": "Hello Study",
+  "description": "An all-in-one study assistant featuring checklists, scribble pads, multimedia notes (audio, video, pictures), pomodoro focused study timer, and a beautiful scientific calculator, with light/dark theme support.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

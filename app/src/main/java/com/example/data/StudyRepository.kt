@@ -40,4 +40,19 @@ class StudyRepository(private val studyDao: StudyDao) {
     suspend fun deleteScribble(id: Int) {
         studyDao.deleteScribbleById(id)
     }
+
+    // === Focus Sessions ===
+    val allFocusSessions: Flow<List<FocusSession>> = studyDao.getAllFocusSessions()
+
+    suspend fun insertFocusSession(session: FocusSession) {
+        studyDao.insertFocusSession(session)
+    }
+
+    suspend fun deleteFocusSession(id: Int) {
+        studyDao.deleteFocusSessionById(id)
+    }
+
+    suspend fun deleteAllFocusSessions() {
+        studyDao.deleteAllFocusSessions()
+    }
 }

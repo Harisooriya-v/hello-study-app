@@ -195,6 +195,9 @@ fun NotesScreen(viewModel: StudyViewModel) {
         if (showAddDialog) {
             AlertDialog(
                 onDismissRequest = { 
+                    titleInput = ""
+                    contentInput = ""
+                    customMediaUri = ""
                     isSimulatingRecording = false
                     showAddDialog = false 
                 },
@@ -211,6 +214,9 @@ fun NotesScreen(viewModel: StudyViewModel) {
                                 }
                             }
                             viewModel.addNote(titleInput, contentInput, selectedNoteType, uriToSave)
+                            titleInput = ""
+                            contentInput = ""
+                            customMediaUri = ""
                             isSimulatingRecording = false
                             showAddDialog = false
                         },
@@ -221,6 +227,9 @@ fun NotesScreen(viewModel: StudyViewModel) {
                 },
                 dismissButton = {
                     TextButton(onClick = { 
+                        titleInput = ""
+                        contentInput = ""
+                        customMediaUri = ""
                         isSimulatingRecording = false
                         showAddDialog = false 
                     }) {

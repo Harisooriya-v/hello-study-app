@@ -30,3 +30,11 @@ data class ScribbleItem(
     val strokeData: String, // Serialized drawing strokes (e.g. "colorIndex:x1,y1|x2,y2;...")
     val timestamp: Long = System.currentTimeMillis()
 )
+
+@Entity(tableName = "focus_sessions")
+data class FocusSession(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val durationMinutes: Int,
+    val sessionType: String, // e.g. "STUDY", "SHORT_BREAK", "LONG_BREAK"
+    val timestamp: Long = System.currentTimeMillis()
+)

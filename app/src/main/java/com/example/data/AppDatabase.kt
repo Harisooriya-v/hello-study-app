@@ -6,8 +6,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [ChecklistItem::class, NoteItem::class, ScribbleItem::class],
-    version = 1,
+    entities = [ChecklistItem::class, NoteItem::class, ScribbleItem::class, FocusSession::class],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

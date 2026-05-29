@@ -155,6 +155,33 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
     val sessionCount = MutableStateFlow(0)
     val customDurationMinutes = MutableStateFlow(25)
 
+    // === Focus Sessions History State ===
+    val focusSessions: StateFlow<List<FocusSession>> = repository.allFocusSessions
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun insertManualFocusSession(duration: Int, type: String) {
+        viewModelScope.launch {
+            repository.insertFocusSession(
+                FocusSession(
+                    durationMinutes = duration,
+                    sessionType = type
+                )
+            )
+        }
+    }
+
+    fun deleteFocusSession(id: Int) {
+        viewModelScope.launch {
+            repository.deleteFocusSession(id)
+        }
+    }
+
+    fun clearAllFocusSessions() {
+        viewModelScope.launch {
+            repository.deleteAllFocusSessions()
+        }
+    }
+
     // === Focus Shield State ===
     val isFocusShieldEnabled = MutableStateFlow(false)
     val customStudyAppName = MutableStateFlow("Duolingo")
@@ -286,7 +313,22 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
             if (pomodoroTimeLeft.value == 0) {
                 isTimerRunning.value = false
                 playFocusDoneSound()
-                if (currentTimerType.value == "STUDY") {
+                val completedType = currentTimerType.value
+                val durationMin = when (completedType) {
+                    "STUDY" -> customDurationMinutes.value
+                    "SHORT_BREAK" -> 5
+                    "LONG_BREAK" -> 15
+                    else -> 25
+                }
+                viewModelScope.launch {
+                    repository.insertFocusSession(
+                        FocusSession(
+                            durationMinutes = durationMin,
+                            sessionType = completedType
+                        )
+                    )
+                }
+                if (completedType == "STUDY") {
                     sessionCount.value += 1
                     setTimerType("SHORT_BREAK")
                 } else {

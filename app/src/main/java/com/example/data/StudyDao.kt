@@ -37,4 +37,17 @@ interface StudyDao {
 
     @Query("DELETE FROM scribble_items WHERE id = :id")
     suspend fun deleteScribbleById(id: Int)
+
+    // === Focus Sessions ===
+    @Query("SELECT * FROM focus_sessions ORDER BY timestamp DESC")
+    fun getAllFocusSessions(): Flow<List<FocusSession>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFocusSession(session: FocusSession)
+
+    @Query("DELETE FROM focus_sessions WHERE id = :id")
+    suspend fun deleteFocusSessionById(id: Int)
+
+    @Query("DELETE FROM focus_sessions")
+    suspend fun deleteAllFocusSessions()
 }

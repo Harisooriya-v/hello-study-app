@@ -156,7 +156,7 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
     val customDurationMinutes = MutableStateFlow(25)
 
     // === Focus Shield State ===
-    val isFocusShieldEnabled = MutableStateFlow(true)
+    val isFocusShieldEnabled = MutableStateFlow(false)
     val customStudyAppName = MutableStateFlow("Duolingo")
     val customStudyAppPackage = MutableStateFlow("com.duolingo")
     val isForbiddenAppActive = MutableStateFlow(false)
@@ -204,49 +204,51 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun checkFocusShieldViolation() {
-        try {
-            if (!isFocusShieldEnabled.value || currentTimerType.value != "STUDY" || !isTimerRunning.value) {
-                isForbiddenAppActive.value = false
-                return
-            }
-            
-            val context = getApplication<Application>()
-            if (isUsageStatsPermissionGranted(context)) {
-                val foregroundPackage = getForegroundPackageName(context)
-                if (foregroundPackage != null) {
-                    val allowedPackages = listOf(
-                        context.packageName,
-                        "com.google.android.googlequicksearchbox", // Google App
-                        "com.google.android.youtube",             // YouTube
-                        "com.whatsapp",                            // WhatsApp
-                        "com.google.android.apps.classroom",       // Google Classroom
-                        customStudyAppPackage.value.trim()         // User's custom allowed app
-                    )
-                    
-                    val isSystemOrHome = foregroundPackage.contains("launcher") || 
-                                         foregroundPackage.contains("home") || 
-                                         foregroundPackage.contains("car") ||
-                                         foregroundPackage == "com.android.systemui" ||
-                                         foregroundPackage == "android"
-                    
-                    if (foregroundPackage !in allowedPackages && !isSystemOrHome) {
-                        val pm = context.packageManager
-                        val appName = try {
-                            val appInfo = pm.getApplicationInfo(foregroundPackage, 0)
-                            pm.getApplicationLabel(appInfo).toString()
-                        } catch (e: Exception) {
-                            foregroundPackage.substringAfterLast('.')
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                if (!isFocusShieldEnabled.value || currentTimerType.value != "STUDY" || !isTimerRunning.value) {
+                    isForbiddenAppActive.value = false
+                    return@launch
+                }
+                
+                val context = getApplication<Application>()
+                if (isUsageStatsPermissionGranted(context)) {
+                    val foregroundPackage = getForegroundPackageName(context)
+                    if (foregroundPackage != null) {
+                        val allowedPackages = listOf(
+                            context.packageName,
+                            "com.google.android.googlequicksearchbox", // Google App
+                            "com.google.android.youtube",             // YouTube
+                            "com.whatsapp",                            // WhatsApp
+                            "com.google.android.apps.classroom",       // Google Classroom
+                            customStudyAppPackage.value.trim()         // User's custom allowed app
+                        )
+                        
+                        val isSystemOrHome = foregroundPackage.contains("launcher") || 
+                                             foregroundPackage.contains("home") || 
+                                             foregroundPackage.contains("car") ||
+                                             foregroundPackage == "com.android.systemui" ||
+                                             foregroundPackage == "android"
+                        
+                        if (foregroundPackage !in allowedPackages && !isSystemOrHome) {
+                            val pm = context.packageManager
+                            val appName = try {
+                                val appInfo = pm.getApplicationInfo(foregroundPackage, 0)
+                                pm.getApplicationLabel(appInfo).toString()
+                            } catch (e: Exception) {
+                                foregroundPackage.substringAfterLast('.')
+                            }
+                            forbiddenAppName.value = appName
+                            isForbiddenAppActive.value = true
+                        } else {
+                            isForbiddenAppActive.value = false
                         }
-                        forbiddenAppName.value = appName
-                        isForbiddenAppActive.value = true
-                    } else {
-                        isForbiddenAppActive.value = false
                     }
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                isForbiddenAppActive.value = false
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            isForbiddenAppActive.value = false
         }
     }
 

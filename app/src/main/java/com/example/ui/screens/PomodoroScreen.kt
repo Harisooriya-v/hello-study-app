@@ -7,6 +7,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -66,19 +68,16 @@ fun PomodoroScreen(viewModel: StudyViewModel) {
 
     // Circular heartbeat size animation when timer runs
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseSizeMultiplier by if (isRunning) {
-        infiniteTransition.animateFloat(
-            initialValue = 0.98f,
-            targetValue = 1.02f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1200, easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "pulse_scale"
-        )
-    } else {
-        remember { mutableStateOf(1.0f) }
-    }
+    val pulseAnim = infiniteTransition.animateFloat(
+        initialValue = 0.98f,
+        targetValue = 1.02f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse_scale"
+    )
+    val pulseSizeMultiplier = if (isRunning) pulseAnim.value else 1.0f
 
     Box(
         modifier = Modifier
@@ -89,6 +88,7 @@ fun PomodoroScreen(viewModel: StudyViewModel) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -185,7 +185,7 @@ fun PomodoroScreen(viewModel: StudyViewModel) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
+                    .wrapContentHeight(),
                 shape = RoundedCornerShape(28.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -194,16 +194,16 @@ fun PomodoroScreen(viewModel: StudyViewModel) {
             ) {
                 Column(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(20.dp),
+                        .fillMaxWidth()
+                        .padding(14.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
                     // Countdown Ring
                     Box(
                         modifier = Modifier
-                            .size(170.dp)
-                            .padding(8.dp),
+                            .size(150.dp)
+                            .padding(6.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         val activeColor = MaterialTheme.colorScheme.primary
@@ -211,7 +211,7 @@ fun PomodoroScreen(viewModel: StudyViewModel) {
 
                         Canvas(
                             modifier = Modifier
-                                .size(150.dp * pulseSizeMultiplier)
+                                .size(130.dp * pulseSizeMultiplier)
                                 .testTag("circular_progress_canvas")
                         ) {
                             drawCircle(

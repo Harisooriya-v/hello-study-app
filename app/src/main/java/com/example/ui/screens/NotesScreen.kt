@@ -16,6 +16,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -35,6 +37,9 @@ fun NotesScreen(viewModel: StudyViewModel) {
 
     var showAddDialog by remember { mutableStateOf(false) }
     var selectedNoteType by remember { mutableStateOf("TEXT") } // TEXT, PICTURE, AUDIO, VIDEO
+    
+    // Track chosen note in viewer
+    var activeViewerNote by remember { mutableStateOf<NoteItem?>(null) }
 
     // Fields for adding notes
     var titleInput by remember { mutableStateOf("") }
@@ -159,7 +164,8 @@ fun NotesScreen(viewModel: StudyViewModel) {
                     items(filteredNotes, key = { it.id }) { note ->
                         NoteCardItem(
                             note = note,
-                            onDelete = { viewModel.deleteNote(note.id) }
+                            onDelete = { viewModel.deleteNote(note.id) },
+                            onClick = { activeViewerNote = note }
                         )
                     }
                 }
@@ -461,13 +467,25 @@ fun NotesScreen(viewModel: StudyViewModel) {
                 }
             )
         }
+
+        activeViewerNote?.let { note ->
+            ActiveNoteViewerDialog(
+                note = note,
+                onDismiss = { activeViewerNote = null },
+                onDelete = {
+                    viewModel.deleteNote(note.id)
+                    activeViewerNote = null
+                }
+            )
+        }
     }
 }
 
 @Composable
 fun NoteCardItem(
     note: NoteItem,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onClick: () -> Unit
 ) {
     var isAudioPlaying by remember { mutableStateOf(false) }
     var currentSeekPercent by remember { mutableStateOf(0.0f) }
@@ -490,6 +508,7 @@ fun NoteCardItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onClick() }
             .testTag("note_card_${note.id}"),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
@@ -506,7 +525,22 @@ fun NoteCardItem(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(100.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                        MaterialTheme.colorScheme.secondaryContainer
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
                     ) {
+                        Icon(
+                            imageVector = Icons.Default.Image,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.25f),
+                            modifier = Modifier.size(32.dp)
+                        )
                         AsyncImage(
                             model = note.mediaUri,
                             contentDescription = "Note Picture Content",
@@ -534,15 +568,21 @@ fun NoteCardItem(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(100.dp)
-                            .background(Color.Black)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.tertiaryContainer,
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            Icons.Default.PlayCircleFilled,
+                            imageVector = Icons.Default.PlayCircleFilled,
                             contentDescription = "Video Play",
-                            tint = Color.White.copy(alpha = 0.8f),
-                            modifier = Modifier
-                                .size(36.dp)
-                                .align(Alignment.Center)
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f),
+                            modifier = Modifier.size(36.dp)
                         )
                         Box(
                             modifier = Modifier
@@ -661,4 +701,561 @@ fun NoteCardItem(
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ActiveNoteViewerDialog(
+    note: NoteItem,
+    onDismiss: () -> Unit,
+    onDelete: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        confirmButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.testTag("viewer_close_button")
+            ) {
+                Text("Close", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDelete,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Delete Note")
+                }
+            }
+        },
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    val icon = when (note.noteType) {
+                        "TEXT" -> Icons.Default.Description
+                        "PICTURE" -> Icons.Default.Image
+                        "AUDIO" -> Icons.Default.Mic
+                        "VIDEO" -> Icons.Default.Videocam
+                        else -> Icons.Default.FolderOpen
+                    }
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = note.noteType,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = note.title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Main Media Center
+                when (note.noteType) {
+                    "PICTURE" -> {
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(220.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(
+                                                MaterialTheme.colorScheme.primaryContainer,
+                                                MaterialTheme.colorScheme.secondaryContainer
+                                            )
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Image,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.25f),
+                                    modifier = Modifier.size(60.dp)
+                                )
+                                AsyncImage(
+                                    model = note.mediaUri,
+                                    contentDescription = "Full Picture Content",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .background(Color.Black.copy(alpha = 0.6f))
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        .fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = "Captured Study Document",
+                                        color = Color.White,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    "VIDEO" -> {
+                        // High-tech Video Player Simulator
+                        var isPlaying by remember { mutableStateOf(false) }
+                        var currentSecs by remember { mutableStateOf(0f) }
+                        val videoDuration = 180f // 3 minutes total
+                        var speedMultiplier by remember { mutableStateOf(1.0f) }
+                        var isMuted by remember { mutableStateOf(false) }
+
+                        LaunchedEffect(isPlaying, speedMultiplier) {
+                            if (isPlaying) {
+                                while (isPlaying && currentSecs < videoDuration) {
+                                    delay((1000 / speedMultiplier).toLong())
+                                    if (isPlaying) {
+                                        currentSecs = (currentSecs + 1f).coerceAtMost(videoDuration)
+                                    }
+                                }
+                                if (currentSecs >= videoDuration) {
+                                    isPlaying = false
+                                }
+                            }
+                        }
+
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.Black),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                // "Screen" content
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(180.dp)
+                                        .background(
+                                            Brush.verticalGradient(
+                                                colors = listOf(Color(0xFF0F172A), Color(0xFF1E293B))
+                                            )
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    // Simulated running visual waveforms / lecture background
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        if (isPlaying) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                repeat(5) { i ->
+                                                    val randomH = remember { mutableStateOf(10.dp) }
+                                                    LaunchedEffect(isPlaying) {
+                                                        while (isPlaying) {
+                                                            delay((80..150).random().toLong())
+                                                            randomH.value = (15..45).random().dp
+                                                        }
+                                                    }
+                                                    Surface(
+                                                        modifier = Modifier
+                                                            .width(5.dp)
+                                                            .height(randomH.value)
+                                                            .clip(CircleShape),
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    ) {}
+                                                }
+                                            }
+                                            Text(
+                                                "Streaming Lecture: ${((speedMultiplier * 10).toInt() / 10f)}x",
+                                                color = Color.White.copy(alpha = 0.5f),
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        } else {
+                                            Icon(
+                                                imageVector = Icons.Default.PlayCircle,
+                                                contentDescription = "Paused",
+                                                tint = Color.White.copy(alpha = 0.6f),
+                                                modifier = Modifier.size(54.dp)
+                                            )
+                                            Text(
+                                                "Lecture Paused",
+                                                color = Color.White.copy(alpha = 0.5f),
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                    }
+
+                                    // Watermark Video pill
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(8.dp)
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(Color.Red)
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            "LIVE LECTURE",
+                                            color = Color.White,
+                                            fontSize = 8.sp,
+                                            fontWeight = FontWeight.Black
+                                        )
+                                    }
+
+                                    // Time Overlay bottom-left
+                                    val formattedCur = String.format("%02d:%01d", (currentSecs / 60).toInt(), (currentSecs % 60).toInt())
+                                    val formattedTot = String.format("%02d:00", (videoDuration / 60).toInt())
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomStart)
+                                            .padding(8.dp)
+                                            .background(Color.Black.copy(alpha = 0.5f))
+                                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = "$formattedCur / $formattedTot",
+                                            color = Color.White,
+                                            fontSize = 9.sp
+                                        )
+                                    }
+                                }
+
+                                // Player control widgets
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    // Custom Slider Seeker
+                                    Slider(
+                                        value = currentSecs,
+                                        onValueChange = { currentSecs = it },
+                                        valueRange = 0f..videoDuration,
+                                        modifier = Modifier
+                                            .height(24.dp)
+                                            .fillMaxWidth(),
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = MaterialTheme.colorScheme.primary,
+                                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                                            inactiveTrackColor = Color.DarkGray
+                                        )
+                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            IconButton(
+                                                onClick = { isPlaying = !isPlaying },
+                                                modifier = Modifier.size(32.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                                    contentDescription = "Play/Pause",
+                                                    tint = Color.White
+                                                )
+                                            }
+
+                                            IconButton(
+                                                onClick = { isMuted = !isMuted },
+                                                modifier = Modifier.size(32.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (isMuted) Icons.Default.VolumeMute else Icons.Default.VolumeUp,
+                                                    contentDescription = "Mute",
+                                                    tint = Color.White
+                                                )
+                                            }
+                                        }
+
+                                        // Playback speeds selector row
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            listOf(1.0f, 1.5f, 2.0f).forEach { speed ->
+                                                val sel = speedMultiplier == speed
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .background(
+                                                            if (sel) MaterialTheme.colorScheme.primary
+                                                            else Color.DarkGray
+                                                        )
+                                                        .clickable { speedMultiplier = speed }
+                                                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                                                ) {
+                                                    Text(
+                                                        "${speed}x",
+                                                        fontSize = 8.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color.White
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    "AUDIO" -> {
+                        // Retro Audio Tape Player
+                        var isPlaying by remember { mutableStateOf(false) }
+                        var currentSecs by remember { mutableStateOf(0f) }
+                        val audioDuration = 45f // 45 seconds mockup voice note
+                        var tapeRotationAngle by remember { mutableStateOf(0f) }
+
+                        LaunchedEffect(isPlaying) {
+                            if (isPlaying) {
+                                while (isPlaying && currentSecs < audioDuration) {
+                                    delay(100)
+                                    if (isPlaying) {
+                                        currentSecs = (currentSecs + 0.1f).coerceAtMost(audioDuration)
+                                        tapeRotationAngle = (tapeRotationAngle + 4f) % 360f
+                                    }
+                                }
+                                if (currentSecs >= audioDuration) {
+                                    isPlaying = false
+                                }
+                            }
+                        }
+
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                            ),
+                            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                // Dynamic Classic Cassette Tape illustration
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(95.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFF27272A)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(36.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // Left reel
+                                        Box(
+                                            modifier = Modifier
+                                                .size(45.dp)
+                                                .clip(CircleShape)
+                                                .background(Color.White.copy(alpha = 0.08f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Canvas(modifier = Modifier.size(36.dp)) {
+                                                drawCircle(Color.LightGray, radius = size.minDimension / 2.0f, style = Stroke(width = 2.dp.toPx()))
+                                                // Spinning spokes
+                                                val spokeCount = 6
+                                                val center = center
+                                                val radius = size.minDimension / 2.0f
+                                                for (i in 0 until spokeCount) {
+                                                    val angle = (i * (360.0 / spokeCount)) + tapeRotationAngle
+                                                    val rad = Math.toRadians(angle)
+                                                    val startX = center.x + (radius * 0.2f * Math.cos(rad)).toFloat()
+                                                    val startY = center.y + (radius * 0.2f * Math.sin(rad)).toFloat()
+                                                    val endX = center.x + (radius * 0.8f * Math.cos(rad)).toFloat()
+                                                    val endY = center.y + (radius * 0.8f * Math.sin(rad)).toFloat()
+                                                    drawLine(Color.LightGray, start = androidx.compose.ui.geometry.Offset(startX, startY), end = androidx.compose.ui.geometry.Offset(endX, endY), strokeWidth = 2.dp.toPx())
+                                                }
+                                            }
+                                        }
+
+                                        // Center small screen slot
+                                        Box(
+                                            modifier = Modifier
+                                                .width(44.dp)
+                                                .height(18.dp)
+                                                .border(1.dp, Color.Gray, RoundedCornerShape(2.dp))
+                                                .background(Color.Black),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = if (isPlaying) "PLAY" else "HOLD",
+                                                color = if (isPlaying) Color.Green else Color.Red,
+                                                fontSize = 7.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+
+                                        // Right reel
+                                        Box(
+                                            modifier = Modifier
+                                                .size(45.dp)
+                                                .clip(CircleShape)
+                                                .background(Color.White.copy(alpha = 0.08f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Canvas(modifier = Modifier.size(36.dp)) {
+                                                drawCircle(Color.LightGray, radius = size.minDimension / 2.0f, style = Stroke(width = 2.dp.toPx()))
+                                                // Spinning spokes
+                                                val spokeCount = 6
+                                                val center = center
+                                                val radius = size.minDimension / 2.0f
+                                                for (i in 0 until spokeCount) {
+                                                    val angle = (i * (360.0 / spokeCount)) + tapeRotationAngle
+                                                    val rad = Math.toRadians(angle)
+                                                    val startX = center.x + (radius * 0.2f * Math.cos(rad)).toFloat()
+                                                    val startY = center.y + (radius * 0.2f * Math.sin(rad)).toFloat()
+                                                    val endX = center.x + (radius * 0.8f * Math.cos(rad)).toFloat()
+                                                    val endY = center.y + (radius * 0.8f * Math.sin(rad)).toFloat()
+                                                    drawLine(Color.LightGray, start = androidx.compose.ui.geometry.Offset(startX, startY), end = androidx.compose.ui.geometry.Offset(endX, endY), strokeWidth = 2.dp.toPx())
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Interactive voice seek bar & timer
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    val formattedCur = String.format("%d:%02d", (currentSecs / 60).toInt(), (currentSecs % 60).toInt())
+                                    val formattedTot = String.format("%d:%02d", (audioDuration / 60).toInt(), (audioDuration % 60).toInt())
+                                    Text(formattedCur, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+
+                                    Slider(
+                                        value = currentSecs,
+                                        onValueChange = { currentSecs = it },
+                                        valueRange = 0f..audioDuration,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(horizontal = 8.dp)
+                                            .height(16.dp),
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = MaterialTheme.colorScheme.primary,
+                                            activeTrackColor = MaterialTheme.colorScheme.primary
+                                        )
+                                    )
+
+                                    Text(formattedTot, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+                                }
+
+                                // Deck Buttons: Rewind, Play/Pause, Fast Forward
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    IconButton(
+                                        onClick = { currentSecs = (currentSecs - 5f).coerceAtLeast(0f) },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(Icons.Default.FastRewind, contentDescription = "Rewind 5s", tint = MaterialTheme.colorScheme.primary)
+                                    }
+
+                                    Button(
+                                        onClick = { isPlaying = !isPlaying },
+                                        shape = CircleShape,
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                        modifier = Modifier.size(48.dp),
+                                        contentPadding = PaddingValues(0.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                            contentDescription = "Tape control button",
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = { currentSecs = (currentSecs + 5f).coerceAtMost(audioDuration) },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(Icons.Default.FastForward, contentDescription = "Fast Forward 5s", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Display written content
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "STUDY MEMO & DESCRIPTION",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = if (note.content.isBlank()) "No written notes provided." else note.content,
+                        style = MaterialTheme.typography.bodyMedium,
+                        lineHeight = 20.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                // Display timestamp detail
+                val sdf = java.text.SimpleDateFormat("EEEE, MMMM dd, yyyy 'at' hh:mm a", java.util.Locale.getDefault())
+                val completeTimeStr = sdf.format(java.util.Date(note.timestamp))
+                Text(
+                    text = "Saved on $completeTimeStr",
+                    fontSize = 9.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+            }
+        }
+    )
 }
